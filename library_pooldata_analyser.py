@@ -2,9 +2,24 @@ import pandas as pd
 import numpy as np
 import library_liquiditypool
 
+def get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "20090101", date_end_yyyymmdd = "30000101"):
+    pool_address = '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed'
+    data_file_name = 'output/output_' + pool_address + '.csv'
+    df = pd.read_csv(data_file_name)
+
+    # Convert 'date' column to YYYYMMDD format
+    df['date_int'] = df['date']
+    df['date'] = pd.to_datetime(df['date'], unit='s').dt.strftime('%Y%m%d')
+    df = df.sort_values(by='date',ascending=False)
+
+    df = df[(df['date'] >= date_begin_yyyymmdd) & (df['date'] <= date_end_yyyymmdd)]
+
+    df['daily_fee_rate'] = df['feesUSD'] / df['tvlUSD']
+    return np.average(df['daily_fee_rate'])
+
 def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year = -1):
 
-    data_file_name = 'output_' + pool_address + '.csv'
+    data_file_name = 'output/output_' + pool_address + '.csv'
     df = pd.read_csv(data_file_name)
 
     # Convert 'date' column to YYYYMMDD format
@@ -49,7 +64,7 @@ def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year =
     price_change_7d_95th = np.percentile(df['price_change_7d'], 95,method='nearest')
     price_change_7d_5th = np.percentile(df['price_change_7d'], 5,method='nearest')
 
-    df.to_csv("datacheck.csv")
+    # df.to_csv("output/datacheck.csv")
 
     # Filter rows corresponding to the percentiles
     accum_fee_rate_7d_95th = df[df['price_change_7d'] == price_change_7d_95th]['accum_fee_rate_7d'].iloc[0]
@@ -102,8 +117,13 @@ if __name__ == "__main__":
         token0 = df_pool_input.at[index,'token0'];
         token1 = df_pool_input.at[index,'token1'];
         fee_bps = df_pool_input.at[index,'fee_bps'];
-        df_result = get_pool_performance_statistic(pool_addr, token0, token1,fee_bps, 2023)
+        df_result = get_pool_performance_statistic(pool_addr, token0, token1,fee_bps, 2022)
         print(df_result)
         df_pool_stats = pd.concat([df_pool_stats, df_result], ignore_index=True)
     
-    df_pool_stats.to_csv('result_pools.csv', index=False)
+    df_pool_stats.to_csv('output/result_pools.csv', index=False)
+
+    print("pool daily yield", get_ETHBTC_poolyield_daily())
+    print("pool daily yield 2023:", get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "20230101"))
+
+    
