@@ -7,5 +7,5 @@ methodology explanation can be found in medium article: https://medium.com/@xben
 
 Code: 
 * main: main.py
-* data: use library_data.py. Data can be pre-saved in output folder for easier check.
+* data: use library_data.py. This file will pre save data into csv in the output folder.
 * logic (imp loss, range, coverage %): library_logic.py

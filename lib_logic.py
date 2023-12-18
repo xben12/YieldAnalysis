@@ -1,10 +1,12 @@
 # function for full range LP
 import numpy as np
 import pandas as pd
+from datetime import datetime
+import lib_const
 
 # Get impermanent loss, qty_change_token0, and token1. 
-# code also works if input is array
-def get_impermanent_loss(price_change, is_change_token0=True, b_return_df = False, ret_imp_loss_only = False ):
+# code also works with  array input
+def get_impermanent_loss_without_range(price_change, is_change_token0=True, b_return_df = False, ret_imp_loss_only = False ):
     #input value check ignored here
     if(is_change_token0):
         price_change_token0 = np.array(price_change)
@@ -41,20 +43,9 @@ def get_impermanent_loss(price_change, is_change_token0=True, b_return_df = Fals
     return result_matrix
 
 
-def get_bin_price_range_same_liquidity(price_change):
-    return -price_change/(1+price_change)
-
-def get_liquidity_boost_by_range(prince_range, benchmark = -0.5):
-    if(benchmark > 0):
-        benchmark = get_bin_price_range_same_liquidity(benchmark)
-
-    boost  = (np.sqrt(1+benchmark) -1 )  / (np.sqrt(1+prince_range) -1 )
-    return boost
-
-
-def get_impermanent_loss_range_pos(price_change, price_range_down, is_change_token0=True, b_return_df = False):
+def get_impermanent_loss_given_range(price_change, price_range_down):
     #input value check ignored here
-    price_range_up = get_bin_price_range_same_liquidity(price_range_down)
+    price_range_up = get_opposite_bin_limit_with_same_liquidity(price_range_down)
 
     #print(price_change,price_range_down, price_range_up )
 
@@ -78,33 +69,56 @@ def get_impermanent_loss_range_pos(price_change, price_range_down, is_change_tok
     return imp_loss
 
 
-def get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "20090101", date_end_yyyymmdd = "30000101"):
+
+
+
+def get_opposite_bin_limit_with_same_liquidity(price_change):
+    return -price_change/(1+price_change)
+
+def get_liquidity_boost_given_range(prince_range, benchmark = -0.5):
+    if(benchmark > 0):
+        benchmark = get_opposite_bin_limit_with_same_liquidity(benchmark)
+
+    boost  = (np.sqrt(1+benchmark) -1 )  / (np.sqrt(1+prince_range) -1 )
+    return boost
+
+
+
+def get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "2009-01-01", date_end_yyyymmdd = "3000-01-01"):
     pool_address = '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed'
-    data_file_name = 'output/output_' + pool_address + '.csv'
+    data_file_name = lib_const.get_pool_filename(pool_address)
+    
     df = pd.read_csv(data_file_name)
 
+    date_begin = datetime.strptime(date_begin_yyyymmdd, '%Y-%m-%d')
+    date_end = datetime.strptime(date_end_yyyymmdd, '%Y-%m-%d')
+
+
     # Convert 'date' column to YYYYMMDD format
-    df['date_int'] = df['date']
-    df['date'] = pd.to_datetime(df['date'], unit='s').dt.strftime('%Y%m%d')
+    df['date'] = pd.to_datetime(df['date'], unit='s')
     df = df.sort_values(by='date',ascending=False)
 
-    df = df[(df['date'] >= date_begin_yyyymmdd) & (df['date'] <= date_end_yyyymmdd)]
+    df = df[(df['date'] >= date_begin) & (df['date'] <= date_end)]
 
     df['daily_fee_rate'] = df['feesUSD'] / df['tvlUSD']
     return np.average(df['daily_fee_rate'])
 
 def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year = -1):
 
-    data_file_name = 'output/output_' + pool_address + '.csv'
+    data_file_name = lib_const.get_pool_filename(pool_address)
+    # data_file_name = 'output/output_' + pool_address + '.csv'
     df = pd.read_csv(data_file_name)
 
     # Convert 'date' column to YYYYMMDD format
     df['date_int'] = df['date']
-    df['date'] = pd.to_datetime(df['date'], unit='s').dt.strftime('%Y%m%d')
-    df = df.sort_values(by='date',ascending=False)
+    df['date'] = pd.to_datetime(df['date'], unit='s')
+    df = df.sort_values(by='date',ascending=False)   
+    
+    #df['date'] = pd.to_datetime(df['date'], unit='s').dt.strftime('%Y%m%d')
 
-    df['year'] = pd.to_datetime(df['date_int'], unit='s').dt.strftime('%Y')
-    df['YYYYMM'] = pd.to_datetime(df['date_int'], unit='s').dt.strftime('%Y%m')
+
+    df['year'] = df['date'].dt.strftime('%Y')
+    df['YYYYMM'] = df['date'].dt.strftime('%Y%m')
     
     # Filter rows where 'year' is not equal to 2023
     if (year != -1):
@@ -148,7 +162,7 @@ def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year =
 
 
     price_change_array = [total_pct_price_change, price_change_7d_95th, price_change_7d_5th]
-    df_pool_imp_loss_stats = get_impermanent_loss(price_change_array, b_return_df=True)
+    df_pool_imp_loss_stats = get_impermanent_loss_without_range(price_change_array, b_return_df=True)
 
 
     # Create a 1-row DataFrame
@@ -186,21 +200,21 @@ if __name__ == "__main__":
     # print("test with range: -----")
 
     price_change = 0.05
-    loss = get_impermanent_loss_range_pos(price_change, price_range_down=-0.16)
+    loss = get_impermanent_loss_given_range(price_change, price_range_down=-0.16)
     print("imp loss",price_change, loss)
 
     
     price_change = -0.08
-    loss = get_impermanent_loss_range_pos(price_change, price_range_down=0.16)
+    loss = get_impermanent_loss_given_range(price_change, price_range_down=0.16)
     print("imp loss, all y gone",price_change, loss)
 
     your_range = -0.05
     benchmark = -0.15
-    print('boost:',your_range,benchmark, "by", get_liquidity_boost_by_range (your_range,benchmark))
+    print('boost:',your_range,benchmark, "by", get_liquidity_boost_given_range (your_range,benchmark))
 
     your_range =np.array([-0.05, -0.1]) 
     benchmark = -0.15
-    print('boost:',your_range,benchmark, "by", get_liquidity_boost_by_range (your_range,benchmark))
+    print('boost:',your_range,benchmark, "by", get_liquidity_boost_given_range (your_range,benchmark))
     
     
         # Load CSV into DataFrame
@@ -231,6 +245,6 @@ if __name__ == "__main__":
     df_pool_stats.to_csv('output/result_pools.csv', index=False)
 
     print("pool daily yield", get_ETHBTC_poolyield_daily())
-    print("pool daily yield 2023:", get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "20230101"))
+    print("pool daily yield 2023:", get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "2023-01-01"))
 
     

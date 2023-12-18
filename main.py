@@ -1,79 +1,83 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime
 import matplotlib.pyplot as plt
-import library_logic as lib_liq
+import lib_logic as lib_liq
+import lib_const
 
 
-print("If you don't have data downloaded, please run data fetcher first!")
-
+print("If you don't have data downloadeded and put as CSV in output folder, please run lib_data.py first!")
+print("Set load_all_pool_related_data and load_price_related_data = True before run ")
 
 def get_df_daily_fees(date_begin_yyyymmdd = "2009-01-01", date_end_yyyymmdd = "3000-01-01"):
+    
+    
     pool_address = '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed'
-    data_file_name = 'output/output_' + pool_address + '.csv'
+    
+    data_file_name = lib_const.get_pool_filename(pool_address)
     df = pd.read_csv(data_file_name)
 
+    date_begin = datetime.strptime(date_begin_yyyymmdd, "%Y-%m-%d")
+    date_end = datetime.strptime(date_end_yyyymmdd, "%Y-%m-%d")
+
     # Convert 'date' column to YYYY-MM-DD format
-    df['date_int'] = df['date']
-    df['date'] = pd.to_datetime(df['date_int'], unit='s').dt.strftime('%Y-%m-%d')
-    df['YYYYMM'] = pd.to_datetime(df['date_int'], unit='s').dt.strftime('%Y%m')
+    df['date'] = pd.to_datetime(df['date'], unit='s')
     df = df.sort_values(by='date',ascending=False)
 
-    df = df[(df['date'] >= date_begin_yyyymmdd) & (df['date'] <= date_end_yyyymmdd)]
+    df = df[(df['date'] >= date_begin) & (df['date'] <= date_end)]
 
     df['daily_fee_rate'] = df['feesUSD'] / df['tvlUSD']
-    df['date_int'] = pd.to_datetime(df['date_int'],  unit='s')
-    df.set_index('date_int', inplace=True)
-    return df[['date', 'YYYYMM', 'feesUSD', 'tvlUSD', 'daily_fee_rate']]
+    df['date_i'] = df['date']
+    df.set_index('date_i', inplace=True)
+    return df[['date', 'feesUSD', 'tvlUSD', 'daily_fee_rate']]
 
 def get_df_daily_price(data_start_yyyy_mm_dd = '2022-12-01'):
 
     # Load the CSV file
-    df = pd.read_csv('output/crypto_prices_with_currency.csv')
-    df = df.drop(columns=['Open', 'High', 'Low']) # the value is not working
-
+    df = pd.read_csv('output/price_data_all_token.csv')
+    date_start = datetime.strptime(data_start_yyyy_mm_dd, "%Y-%m-%d")
+ 
+    df['date'] = pd.to_datetime(df['date'])
+ 
     # Filter rows related to ETH price in terms of BTC
-    df = df[(df['Token'] == 'ETH') & (df['vs_currency'] == 'btc') & (df['Date'] >= data_start_yyyy_mm_dd)]
+    df = df[(df['token'] == 'ETH') & (df['vs_currency'] == 'btc') & (df['date'] >= date_start)]
+    df["YYYYMM"] = df['date'].dt.strftime('%Y%m')
 
-    # Convert the 'Date' column to a datetime object
-    df['Date'] = pd.to_datetime(df['Date'])
-    df['DateYMD'] = df['Date']
-
-    # Group by 'Token' and the month of the 'Date' column
-    grouped = df.groupby(['Token', df['Date'].dt.year, df['Date'].dt.month])
-
-    # Calculate the first date and close price of each month for each group
-    df['Date_Month_Begin'] = grouped['Date'].transform('min')
-    df['Date_Month_End'] = grouped['Date'].transform('max')
-    df['Close_Month_Begin'] = grouped['Close'].transform('first')
-    df['Close_Month_End'] = grouped['Close'].transform('last')
-    df['Price_chg_vs_MM01'] = df['Close'] / df['Close_Month_Begin'] -1
-    df.drop(df[ df['Date_Month_End'].dt.day < 21 ].index, inplace=True) # filter out months with data < 3 weeks
-
-    eth_btc_df = df
-    # Calculate monthly return (30 day intervals)
-    eth_btc_df['DateYMD'] = pd.to_datetime(eth_btc_df['DateYMD'])
-    eth_btc_df.set_index('DateYMD', inplace=True)
-    eth_btc_df = eth_btc_df[~eth_btc_df.index.duplicated(keep='last')] # Remove duplicates by taking the last value for each date
-    return eth_btc_df
+   
+    df.set_index('date', inplace=True)
+    df = df[~df.index.duplicated(keep='last')] # Remove duplicates by taking the last value for each date
+    return df
 
 
 def get_df_comb_price_fee(df_price, df_fee):
+
     df = pd.merge(df_price, df_fee, left_index=True, right_index=True)
+     # Group by 'Token' and the month of the 'date' column
+    grouped = df.groupby(['token', 'YYYYMM' ])
+
+    # Calculate the first date and close price of each month for each group
+    df['month_begin_date'] = grouped['date'].transform('min')
+    df['month_last_date'] = grouped['date'].transform('max')
+    df['price_month_begin_date'] = grouped['price'].transform('first')
+    df['price_month_end_date'] = grouped['price'].transform('last')
+    df['Price_chg_vs_MM01'] = df['price'] / df['price_month_begin_date'] -1
+    df.drop(df[ df['month_last_date'].dt.day < 21 ].index, inplace=True) # filter out months with data < 3 weeks
+
     return df
 
 def get_mon_performance_by_range(range_down, df, benchmark_down = -0.3):
-        df_mon_chg = df[[ 'YYYYMM', 'Price_chg_vs_MM01']][df['Date_Month_End'] == df['Date']]
+        df_mon_chg = df[[ 'YYYYMM', 'Price_chg_vs_MM01']][df['month_last_date'] == df['date']]
         df_mon_chg.dropna(inplace=True)
 
-        df_mon_day_ret = df[['YYYYMM',  'Price_chg_vs_MM01','daily_fee_rate' ]][df['Date_Month_Begin'] != df['Date']]
+        df_mon_day_ret = df[['YYYYMM',  'Price_chg_vs_MM01','daily_fee_rate' ]][df['month_begin_date'] != df['date']]
 
         lower_bound = range_down
         benchmark_lower = benchmark_down
-        upper_bound = lib_liq.get_bin_price_range_same_liquidity(lower_bound)
+        upper_bound = lib_liq.get_opposite_bin_limit_with_same_liquidity(lower_bound)
 
         ret_columns = ['YYYYMM', 'range_down', 'mon_total_price_chg', 'mon_total_fee_yield', 'coverage_rate', 'boost_factor', 'gross_return', 'imp_loss',  'net_return']
 
-        boost_factor = lib_liq.get_liquidity_boost_by_range(prince_range=lower_bound, benchmark=benchmark_lower)
+        boost_factor = lib_liq.get_liquidity_boost_given_range(prince_range=lower_bound, benchmark=benchmark_lower)
         result_mon = np.empty((len(df_mon_chg), len(ret_columns)))
 
         for mon_i in range(len(df_mon_chg)):
@@ -90,7 +94,7 @@ def get_mon_performance_by_range(range_down, df, benchmark_down = -0.3):
 
                 gross_return = mon_total_fee_yield*coverage_rate*boost_factor
 
-                imp_loss = lib_liq.get_impermanent_loss_range_pos(mon_total_price_chg, lower_bound)
+                imp_loss = lib_liq.get_impermanent_loss_given_range(mon_total_price_chg, lower_bound)
 
                 net_return = (1+gross_return)*(1+imp_loss) -1
 
@@ -156,6 +160,8 @@ def main ():
     df_price = get_df_daily_price(data_start_yyyy_mm_dd)
     df_fee = get_df_daily_fees(date_begin_yyyymmdd = data_start_yyyy_mm_dd)
     df = get_df_comb_price_fee(df_price, df_fee)
+    print("\n check df")
+    print(df.head())
     df_result = get_full_range_performance(range_down, df, benchmark_range=benchmark_range)
 
     result_file_name = 'output/eth_btc_lp_range_result_v3.csv' 
