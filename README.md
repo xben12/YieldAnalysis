@@ -1,9 +1,11 @@
-Run main_btceth_range_analysis.py. Details explanation can be found in Medium article (link later). 
+# how to run it
+* poetry install
+* poetry run python main.py
 
-The code is done with help from ChatGPT. It greatly improved my productivity.
+# detail
+methodology explanation can be found in medium article: https://medium.com/@xben12/defi-decode-liquidity-mining-yield-impermanent-loss-and-set-optimal-range-e20c3472d2bb
 
-The Github link contain 4 files, explained below:
-* Data source: run  library_datafetcher.py. 
-* Utility library_liquiditypool.py, contains function to get impermanent loss, range boost factor, 
-* Utility library_pooldata_analyser.py, get average daily yield
-* Main script: main_btceth_range_analysis.py
+Code: 
+* main: main.py
+* data: use library_data.py. Data can be pre-saved in output folder for easier check.
+* logic (imp loss, range, coverage %): library_logic.py
