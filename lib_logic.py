@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import lib_const
+import lib_data
 
 # Get impermanent loss, qty_change_token0, and token1. 
 # code also works with  array input
@@ -69,9 +69,6 @@ def get_impermanent_loss_given_range(price_change, price_range_down):
     return imp_loss
 
 
-
-
-
 def get_opposite_bin_limit_with_same_liquidity(price_change):
     return -price_change/(1+price_change)
 
@@ -85,37 +82,17 @@ def get_liquidity_boost_given_range(prince_range, benchmark = -0.5):
 
 
 def get_ETHBTC_poolyield_daily(date_begin_yyyymmdd = "2009-01-01", date_end_yyyymmdd = "3000-01-01"):
-    pool_address = '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed'
-    data_file_name = lib_const.get_pool_filename(pool_address)
     
-    df = pd.read_csv(data_file_name)
-
-    date_begin = datetime.strptime(date_begin_yyyymmdd, '%Y-%m-%d')
-    date_end = datetime.strptime(date_end_yyyymmdd, '%Y-%m-%d')
-
-
-    # Convert 'date' column to YYYYMMDD format
-    df['date'] = pd.to_datetime(df['date'], unit='s')
-    df = df.sort_values(by='date',ascending=False)
-
-    df = df[(df['date'] >= date_begin) & (df['date'] <= date_end)]
+    pool_address = '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed'
+    
+    df= lib_data.get_uniswap_pool_data_csv(pool_address, date_begin_yyyymmdd, date_end_yyyymmdd)
 
     df['daily_fee_rate'] = df['feesUSD'] / df['tvlUSD']
     return np.average(df['daily_fee_rate'])
 
 def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year = -1):
 
-    data_file_name = lib_const.get_pool_filename(pool_address)
-    # data_file_name = 'output/output_' + pool_address + '.csv'
-    df = pd.read_csv(data_file_name)
-
-    # Convert 'date' column to YYYYMMDD format
-    df['date_int'] = df['date']
-    df['date'] = pd.to_datetime(df['date'], unit='s')
-    df = df.sort_values(by='date',ascending=False)   
-    
-    #df['date'] = pd.to_datetime(df['date'], unit='s').dt.strftime('%Y%m%d')
-
+    df= lib_data.get_uniswap_pool_data_csv(pool_address)
 
     df['year'] = df['date'].dt.strftime('%Y')
     df['YYYYMM'] = df['date'].dt.strftime('%Y%m')
@@ -143,8 +120,6 @@ def get_pool_performance_statistic(pool_address, token0, token1, fee_bps, year =
     total_log_price_change = df['log_price_change'].sum()
     total_pct_price_change = np.exp(total_log_price_change) -1
     total_lp_yield = df['daily_fee_rate'].sum()
-
-
 
     df['accum_fee_rate_7d'] = df['daily_fee_rate'].rolling(window=7).sum()
     df['price_change_7d'] = df['token0Price'].pct_change(7)

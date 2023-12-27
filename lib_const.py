@@ -26,6 +26,8 @@ def get_pool_filename(pool_address, token0=None, token1=None):
     file_name = 'output/pool_data_' + file_name_addon + '.csv'
     return file_name
 
+def get_crypto_price_filename(token = None):
+    return 'output/price_data_all_token.csv'
 
 #    date_begin = datetime.strptime(date_begin_yyyymmdd, '%Y%m%d')
 #    date_end = datetime.strptime(date_end_yyyymmdd, '%Y%m%d')

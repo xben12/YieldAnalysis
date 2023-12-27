@@ -1,7 +1,23 @@
 import requests
 from datetime import datetime, timedelta
 import pandas as pd
+import lib_const
 
+
+def get_crypto_price_data_csv(date_begin=datetime(2000, 1,1), date_end=datetime(3000,1,1)):
+
+    file_name = lib_const.get_crypto_price_filename()
+    df=pd.read_csv(file_name)
+    df['date'] = pd.to_datetime(df['date'])
+    
+    if(isinstance(date_begin, str)) :
+        date_begin = datetime.strptime(date_begin, "%Y-%m-%d")
+    if(isinstance(date_end, str)) :
+        date_end = datetime.strptime(date_end, "%Y-%m-%d")
+    df = df[ (df['date'] >= date_begin) & (df['date'] <= date_end) ]
+    
+    df.set_index('date', inplace=True)
+    return df
 
 # API each time can only get 100 recoreds, hence break down the retrieve into year-month
 def get_uniswap_v3_data_limit100(pool_address, from_timestamp, to_timestamp):
@@ -44,7 +60,7 @@ def last_day_of_month(year, month):
     return last_day_of_month
 
 
-def get_uniswap_v3_data_year(pool_address, years):
+def download_uniswap_v3_data_year(pool_address, years):
     pool_df=pd.DataFrame()
 
     # Get Uniswap V3 data
@@ -60,7 +76,26 @@ def get_uniswap_v3_data_year(pool_address, years):
             
     return pool_df
 
-def get_crypto_price(symbol, token, start_date, end_date, vs_currency='usd'):
+
+
+    
+
+def get_uniswap_pool_data_csv(pool_address, date_begin=datetime(2000, 1,1), date_end=datetime(3000,1,1)):
+    data_file_name = lib_const.get_pool_filename(pool_address)
+    df = pd.read_csv(data_file_name)
+    
+    if(isinstance(date_begin, str)) :
+        date_begin = datetime.strptime(date_begin, "%Y-%m-%d")
+    if(isinstance(date_end, str)) :
+        date_end = datetime.strptime(date_end, "%Y-%m-%d")
+    
+    df['date'] = pd.to_datetime(df['date'], unit='s')
+    df = df[(df['date'] >= date_begin) & (df['date'] <= date_end)]
+    df = df.sort_values(by='date',ascending=False)   
+    return df
+
+
+def download_crypto_price(symbol, token, start_date, end_date, vs_currency='usd'):
     url = f"https://api.coingecko.com/api/v3/coins/{symbol}/market_chart"
     params = {
         'vs_currency': vs_currency,
@@ -102,12 +137,12 @@ if __name__ == "__main__":
     load_all_pool_related_data = True
     if load_all_pool_related_data: # getting pool fee/vol related data
         
-        years = [2022, 2023]
+        years = [2021, 2022, 2023]
         
         result_df = pd.DataFrame()
         for pool_info in lib_const.pool_info_list:
             pool_address = pool_info[0]
-            result_df = get_uniswap_v3_data_year(pool_address, years)
+            result_df = download_uniswap_v3_data_year(pool_address, years)
             file_name = lib_const.get_pool_filename(pool_address, token0=pool_info[1], token1=pool_info[2])
             print("save data:",file_name )
             result_df.to_csv(file_name, index=False)
@@ -138,11 +173,11 @@ if __name__ == "__main__":
         for token in lib_const.price_token_list:
             token_name = token[0]
             token_ticker = token[1] 
-            df_price = get_crypto_price(token_name, token_ticker , start_date, end_date)
+            df_price = download_crypto_price(token_name, token_ticker , start_date, end_date)
             print(f'get token {token_ticker} price in usd' )
             df_price_btc = pd.DataFrame()
             if(token_ticker != 'BTC'):
-                df_price_btc = get_crypto_price(token_name, token_ticker , start_date, end_date, vs_currency='btc')
+                df_price_btc = download_crypto_price(token_name, token_ticker , start_date, end_date, vs_currency='btc')
                 print(f'get token {token_ticker} price in btc' )
                 
             df = pd.concat([df, df_price, df_price_btc], ignore_index=True)
