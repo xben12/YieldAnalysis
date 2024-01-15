@@ -12,6 +12,7 @@ numpy = "^1.26.2"
 pandas = "^2.1.4"
 requests = "^2.31.0"
 matplotlib = "^3.8.2"
+statsmodels = "^0.14.1"
 
 
 [tool.poetry.group.dev.dependencies]

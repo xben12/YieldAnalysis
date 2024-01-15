@@ -72,7 +72,7 @@ plt.plot(x, y, marker='o', linestyle='-')
 plt.title('Range (bin) Asset amount vs range_down value')
 plt.xlabel('range_down')
 plt.ylabel('Range Asset amount')
-plt.ylim(0, 3)
+plt.ylim(0, 7)
 plt.grid(True)
 plt.show()
 
